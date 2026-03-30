@@ -25,6 +25,7 @@ func run() error {
 
 	// Загружаем конфиг
 	cfg := config.GetConfig()
+	// log.Println("ACCRUAL:", cfg.AccuralAddress.URL())
 
 	// Репозиторий
 	repo, err := repository.NewPostgres(ctx, string(cfg.DatabaseURI))
@@ -38,7 +39,11 @@ func run() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	accrualClient := accrual.NewClient(cfg.AccuralAddress.URL())
+	accrualURL := cfg.AccuralAddress.URL()
+	if accrualURL == "" {
+		return fmt.Errorf("accrual system address is not set")
+	}
+	accrualClient := accrual.NewClient(accrualURL)
 
 	worker := worker.NewOrderWorker(repo, accrualClient)
 

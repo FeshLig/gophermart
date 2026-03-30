@@ -21,8 +21,8 @@ func GetConfig() Config {
 			Port: 8080,
 		},
 		AccuralAddress: flags.AccuralSystemAddress{
-			Host: "localhost",
-			Port: 8000,
+			Host: "",
+			Port: 0,
 		},
 		DatabaseURI: "",
 	}
@@ -42,19 +42,19 @@ func parseFlags(config *Config) {
 }
 
 func parseEnv(config *Config) error {
-	if addrStr, ok := os.LookupEnv("RUN_ADDRESS"); ok {
+	if addrStr, ok := os.LookupEnv("RUN_ADDRESS"); ok && addrStr != "" {
 		if err := config.Address.Set(addrStr); err != nil {
 			return fmt.Errorf("invalid value of RUN_ADDRESS: %w", err)
 		}
 	}
 
-	if databaseURIStr, ok := os.LookupEnv("DATABASE_URI"); ok {
+	if databaseURIStr, ok := os.LookupEnv("DATABASE_URI"); ok && databaseURIStr != "" {
 		if err := config.DatabaseURI.Set(databaseURIStr); err != nil {
 			return fmt.Errorf("wrong value of DATABASE_URI: %w", err)
 		}
 	}
 
-	if accuralAddressStr, ok := os.LookupEnv("ACCRUAL_SYSTEM_ADDRESS"); ok {
+	if accuralAddressStr, ok := os.LookupEnv("ACCRUAL_SYSTEM_ADDRESS"); ok && accuralAddressStr != "" {
 		if err := config.AccuralAddress.Set(accuralAddressStr); err != nil {
 			return fmt.Errorf("wrong value of ACCRUAL_SYSTEM_ADDRESS: %w", err)
 		}
