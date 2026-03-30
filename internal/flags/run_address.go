@@ -1,9 +1,8 @@
 package flags
 
 import (
-	"errors"
+	"net"
 	"strconv"
-	"strings"
 )
 
 type RunAddress struct {
@@ -16,15 +15,22 @@ func (a RunAddress) String() string {
 }
 
 func (a *RunAddress) Set(s string) error {
-	hp := strings.Split(s, ":")
-	if len(hp) != 2 {
-		return errors.New("need address in a form host:port")
-	}
-	port, err := strconv.Atoi(hp[1])
+	host, portStr, err := net.SplitHostPort(s)
 	if err != nil {
 		return err
 	}
-	a.Host = hp[0]
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return err
+	}
+
+	if host == "" {
+		host = "localhost"
+	}
+
+	a.Host = host
 	a.Port = port
+
 	return nil
 }
