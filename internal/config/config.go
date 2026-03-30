@@ -21,8 +21,8 @@ func GetConfig() Config {
 			Port: 8080,
 		},
 		AccuralAddress: flags.AccuralSystemAddress{
-			Host: "",
-			Port: -1,
+			Host: "localhost",
+			Port: 8000,
 		},
 		DatabaseURI: "",
 	}
