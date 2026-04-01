@@ -28,9 +28,9 @@ func GetConfig() Config {
 	}
 
 	parseFlags(&config)
-	fmt.Printf("ADDRESS: %s", config.Address.String())
-	parseEnv(&config)
-	fmt.Printf("ADDRESS: %s", config.Address.String())
+	if err := parseEnv(&config); err != nil {
+		panic(err)
+	}
 
 	return config
 }
@@ -44,8 +44,6 @@ func parseFlags(config *Config) {
 }
 
 func parseEnv(config *Config) error {
-	addrStr, _ := os.LookupEnv("RUN_ADDRESS")
-	fmt.Printf("ADDRESS: %s", addrStr)
 
 	if addrStr, ok := os.LookupEnv("RUN_ADDRESS"); ok && addrStr != "" {
 		if err := config.Address.Set(addrStr); err != nil {

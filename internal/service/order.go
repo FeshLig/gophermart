@@ -73,6 +73,7 @@ func isValidLuhn(number string) bool {
 	var alternate bool
 
 	for i := len(number) - 1; i >= 0; i-- {
+
 		n := int(number[i] - '0')
 
 		if n < 0 || n > 9 {
@@ -88,6 +89,7 @@ func isValidLuhn(number string) bool {
 
 		sum += n
 		alternate = !alternate
+
 	}
 
 	return sum%10 == 0

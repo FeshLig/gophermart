@@ -25,7 +25,6 @@ func run() error {
 
 	// Загружаем конфиг
 	cfg := config.GetConfig()
-	log.Println("ADDR:", cfg.Address.String())
 
 	// Репозиторий
 	repo, err := repository.NewPostgres(ctx, string(cfg.DatabaseURI))

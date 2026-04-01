@@ -30,6 +30,7 @@ func NewWithdrawalService(repo repository.WithdrawalRepository, balance BalanceS
 
 // Создание нового снятия
 func (s *WithdrawalServiceImpl) Withdraw(ctx context.Context, userID int64, order string, sum float64) error {
+
 	// проверяем баланс
 	balanceDTO, err := s.balanceService.GetBalance(ctx, userID)
 	if err != nil {

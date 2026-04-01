@@ -23,6 +23,26 @@ func (a AccuralSystemAddress) String() string {
 
 // Set разбирает строку вида host:port
 func (a *AccuralSystemAddress) Set(s string) error {
+
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
+		u, err := url.Parse(s)
+		if err != nil {
+			return err
+		}
+		host := u.Hostname()
+		portStr := u.Port()
+		if portStr == "" {
+			return errors.New("port is required")
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return err
+		}
+		a.Host = host
+		a.Port = port
+		return nil
+	}
+
 	hp := strings.Split(s, ":")
 	if len(hp) != 2 {
 		return errors.New("need service address in a form host:port")

@@ -23,19 +23,17 @@ func (p *Postgres) CreateWithdrawal(ctx context.Context, withdrawal model.Withdr
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
-
 	var balance float64
 
 	err = tx.QueryRow(ctx, `
-	SELECT 
-		COALESCE(SUM(accrual), 0) - COALESCE((
-			SELECT SUM(sum) FROM withdrawals WHERE user_id = $1
-		), 0)
-	FROM orders
-	WHERE user_id = $1
-	  AND status = 'PROCESSED'
-	FOR UPDATE
-`, withdrawal.UserID).Scan(&balance)
+		SELECT 
+			COALESCE(SUM(accrual), 0) - COALESCE((
+				SELECT SUM(sum) FROM withdrawals WHERE user_id = $1
+			), 0)
+		FROM orders
+		WHERE user_id = $1
+		AND status = 'PROCESSED'
+	`, withdrawal.UserID).Scan(&balance)
 
 	if err != nil {
 		return err
