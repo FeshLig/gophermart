@@ -13,7 +13,6 @@ type AccuralSystemAddress struct {
 	Port int
 }
 
-// String нужен для интерфейса flag.Value
 func (a AccuralSystemAddress) String() string {
 	if a.Port <= 0 {
 		return ""
@@ -21,7 +20,6 @@ func (a AccuralSystemAddress) String() string {
 	return fmt.Sprintf("%s:%d", a.Host, a.Port)
 }
 
-// Set разбирает строку вида host:port
 func (a *AccuralSystemAddress) Set(s string) error {
 
 	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
@@ -56,7 +54,6 @@ func (a *AccuralSystemAddress) Set(s string) error {
 	return nil
 }
 
-// URL возвращает полный URL с http протоколом, например: http://localhost:8000
 func (a AccuralSystemAddress) URL() string {
 	if a.Host == "" || a.Port <= 0 {
 		return ""

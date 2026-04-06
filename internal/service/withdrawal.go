@@ -28,10 +28,8 @@ func NewWithdrawalService(repo repository.WithdrawalRepository, balance BalanceS
 	}
 }
 
-// Создание нового снятия
 func (s *WithdrawalServiceImpl) Withdraw(ctx context.Context, userID int64, order string, sum float64) error {
 
-	// проверяем баланс
 	balanceDTO, err := s.balanceService.GetBalance(ctx, userID)
 	if err != nil {
 		return err
@@ -41,7 +39,6 @@ func (s *WithdrawalServiceImpl) Withdraw(ctx context.Context, userID int64, orde
 		return ErrInsufficientFunds
 	}
 
-	// конвертируем номер заказа
 	orderNumber, err := strconv.ParseInt(order, 10, 64)
 	if err != nil {
 		return ErrInvalidOrderNumber
@@ -53,11 +50,9 @@ func (s *WithdrawalServiceImpl) Withdraw(ctx context.Context, userID int64, orde
 		Sum:         sum,
 	}
 
-	// сохраняем в репозиторий
 	return s.withdrawalRepo.CreateWithdrawal(ctx, withdrawal)
 }
 
-// Получение всех снятий пользователя
 func (s *WithdrawalServiceImpl) GetWithdrawals(ctx context.Context, userID int64) ([]model.Withdrawal, error) {
 	withdrawals, err := s.withdrawalRepo.GetWithdrawalsByUser(ctx, userID)
 	if err != nil {

@@ -18,9 +18,8 @@ func NewOrderHandler(orderService service.OrderService) *OrderHandler {
 }
 
 func (h *OrderHandler) UploadOrder(c *gin.Context) {
-	userID := c.GetInt64("userID") // из AuthMiddleware
+	userID := c.GetInt64("userID")
 
-	// читаем тело запроса целиком
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil || len(body) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})

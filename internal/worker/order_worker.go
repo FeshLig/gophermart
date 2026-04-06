@@ -62,10 +62,10 @@ func (w *OrderWorker) handleOrder(ctx context.Context, order model.Order) {
 
 	switch statusCode {
 	case 204:
-		return // ещё не готов
+		return
 
 	case 429:
-		time.Sleep(time.Second) // rate limit
+		time.Sleep(time.Second)
 		return
 	}
 

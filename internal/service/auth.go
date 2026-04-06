@@ -16,24 +16,22 @@ import (
 )
 
 var (
+	ErrUniqueViolation    = errors.New("unique violation for test")
 	ErrUserAlreadyExists  = errors.New("user already exists")
 	ErrInvalidCredentials = errors.New("invalid login or password")
 )
 
-// AuthService интерфейс
 type AuthService interface {
 	Register(ctx context.Context, login string, password string) (string, error)
 	Login(ctx context.Context, login string, password string) (string, error)
 	GetJWTSecret() string
 }
 
-// AuthServiceImpl реализация
 type AuthServiceImpl struct {
 	repo      repository.UserRepository
 	jwtSecret string
 }
 
-// NewAuthService создаёт сервис с внутренним секретом JWT
 func NewAuthService(repo repository.UserRepository) *AuthServiceImpl {
 	return &AuthServiceImpl{
 		repo:      repo,
@@ -41,22 +39,19 @@ func NewAuthService(repo repository.UserRepository) *AuthServiceImpl {
 	}
 }
 
-// Генерация случайного секретного ключа для JWT
 func generateRandomSecret() string {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	if err != nil {
-		panic("failed to generate JWT secret") // можно обработать иначе
+		panic("failed to generate JWT secret")
 	}
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Получить секрет JWT (для мидлвары)
 func (s *AuthServiceImpl) GetJWTSecret() string {
 	return s.jwtSecret
 }
 
-// Register создаёт нового пользователя и возвращает JWT
 func (s *AuthServiceImpl) Register(ctx context.Context, login string, password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -79,7 +74,6 @@ func (s *AuthServiceImpl) Register(ctx context.Context, login string, password s
 	return s.generateToken(id)
 }
 
-// Login проверяет пользователя и возвращает JWT
 func (s *AuthServiceImpl) Login(ctx context.Context, login string, password string) (string, error) {
 	user, err := s.repo.GetUserByLogin(ctx, login)
 	if err != nil {
@@ -96,7 +90,6 @@ func (s *AuthServiceImpl) Login(ctx context.Context, login string, password stri
 	return s.generateToken(user.ID)
 }
 
-// Генерация JWT
 func (s *AuthServiceImpl) generateToken(userID int64) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
@@ -107,8 +100,10 @@ func (s *AuthServiceImpl) generateToken(userID int64) (string, error) {
 	return token.SignedString([]byte(s.jwtSecret))
 }
 
-// Проверка уникальности ошибки PostgreSQL
 func isUniqueViolation(err error) bool {
+	if err == ErrUniqueViolation {
+		return true
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		return pgErr.Code == "23505"

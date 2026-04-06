@@ -4,13 +4,26 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// postgres://gopher:2281337@localhost:5432/gophermart?sslmode=disable
+type DB interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Ping(ctx context.Context) error
+	Close()
+}
 
 type Postgres struct {
-	pool *pgxpool.Pool
+	pool DB
+}
+
+func NewPostgresWithDB(db DB) *Postgres {
+	return &Postgres{pool: db}
 }
 
 func NewPostgres(ctx context.Context, dsn string) (*Postgres, error) {

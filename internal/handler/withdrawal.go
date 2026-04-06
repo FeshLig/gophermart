@@ -19,7 +19,6 @@ func NewWithdrawalHandler(ws service.WithdrawalService) *WithdrawalHandler {
 	}
 }
 
-// POST /api/withdraw
 func (h *WithdrawalHandler) Withdraw(c *gin.Context) {
 	userIDVal, exists := c.Get("userID")
 	if !exists {
@@ -55,7 +54,6 @@ func (h *WithdrawalHandler) Withdraw(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-// GET /api/withdrawals
 func (h *WithdrawalHandler) GetWithdrawals(c *gin.Context) {
 	userIDVal, exists := c.Get("userID")
 	if !exists {

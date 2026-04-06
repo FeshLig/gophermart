@@ -25,17 +25,17 @@ func NewRouter(handlers *handler.Handlers, getJWTSecret func() string) *Router {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// --- API ---
+	// API
 	api := r.Group("/api")
 
-	// --- Публичные маршруты (без auth) ---
+	// Публичные маршруты
 	api.POST("/user/register", handlers.Auth.Register)
 	api.POST("/user/login", handlers.Auth.Login)
 
-	// --- Middleware авторизации ---
+	// Middleware авторизации
 	authMiddleware := middleware.AuthMiddleware(getJWTSecret)
 
-	// --- Защищённые маршруты ---
+	// Защищённые маршруты
 	auth := api.Group("/user")
 	auth.Use(authMiddleware)
 
