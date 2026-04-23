@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FeshLig/gophermart/internal/dto"
-	"github.com/FeshLig/gophermart/internal/mapper"
 	"github.com/FeshLig/gophermart/internal/model"
 	"github.com/FeshLig/gophermart/internal/repository"
 )
@@ -45,5 +44,5 @@ func (s *BalanceServiceImpl) GetBalance(ctx context.Context, userID int64) (dto.
 
 	current -= withdrawn
 
-	return mapper.ToBalanceDTO(current, withdrawn), nil
+	return dto.ToBalanceDTO(current, withdrawn), nil
 }

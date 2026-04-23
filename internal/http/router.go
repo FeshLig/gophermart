@@ -6,18 +6,19 @@ import (
 	"github.com/FeshLig/gophermart/internal/handler"
 	"github.com/FeshLig/gophermart/internal/middleware"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type Router struct {
 	engine *gin.Engine
 }
 
-func NewRouter(handlers *handler.Handlers, getJWTSecret func() string) *Router {
+func NewRouter(handlers *handler.Handlers, getJWTSecret func() string, logger *zap.Logger) *Router {
 	r := gin.New()
 
 	// Глобальные middleware
 	r.Use(gin.Recovery())
-	r.Use(middleware.Logger())
+	r.Use(middleware.Logger(logger))
 	r.Use(middleware.Gzip())
 
 	// Healthcheck
@@ -57,4 +58,8 @@ func NewRouter(handlers *handler.Handlers, getJWTSecret func() string) *Router {
 
 func (r *Router) Run(addr string) error {
 	return r.engine.Run(addr)
+}
+
+func (r *Router) Engine() *gin.Engine {
+	return r.engine
 }

@@ -22,7 +22,7 @@ func setupRouter(secret string) *gin.Engine {
 	}))
 
 	r.GET("/test", func(c *gin.Context) {
-		userID, exists := c.Get("userID")
+		userID, exists := middleware.UserIDFromContext(c.Request.Context())
 		if !exists {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "no user"})
 			return

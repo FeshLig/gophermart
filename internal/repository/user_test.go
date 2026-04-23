@@ -10,6 +10,7 @@ import (
 	"github.com/FeshLig/gophermart/internal/repository"
 	"github.com/pashagolub/pgxmock/v3"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestCreateUser(t *testing.T) {
@@ -28,7 +29,7 @@ func TestCreateUser(t *testing.T) {
 		WithArgs(user.Login, user.PasswordHash).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(int64(1)))
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	id, err := repo.CreateUser(ctx, user)
 	require.NoError(t, err)
@@ -51,7 +52,7 @@ func TestCreateUser_QueryError(t *testing.T) {
 		WithArgs(user.Login, user.PasswordHash).
 		WillReturnError(errors.New("query error"))
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	_, err := repo.CreateUser(ctx, user)
 	require.Error(t, err)
@@ -80,7 +81,7 @@ func TestGetUserByLogin(t *testing.T) {
 		WithArgs(mockUser.Login).
 		WillReturnRows(rows)
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	user, err := repo.GetUserByLogin(ctx, mockUser.Login)
 	require.NoError(t, err)
@@ -100,7 +101,7 @@ func TestGetUserByLogin_NotFound(t *testing.T) {
 		WithArgs("unknown").
 		WillReturnError(errors.New("no rows in result set"))
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	_, err := repo.GetUserByLogin(ctx, "unknown")
 	require.Error(t, err)
@@ -118,7 +119,7 @@ func TestGetUserByLogin_ScanError(t *testing.T) {
 		WithArgs("user").
 		WillReturnError(errors.New("scan error"))
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	_, err := repo.GetUserByLogin(ctx, "user")
 	require.Error(t, err)

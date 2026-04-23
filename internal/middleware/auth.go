@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -8,6 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 )
+
+type contextKey string
+
+func (c contextKey) String() string {
+	return "middleware context key " + string(c)
+}
+
+var userIDKey = contextKey("user-id")
 
 func AuthMiddleware(getSecret func() string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -50,7 +59,13 @@ func AuthMiddleware(getSecret func() string) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("userID", int64(userIDFloat))
+		ctx := context.WithValue(
+			c.Request.Context(),
+			userIDKey,
+			int64(userIDFloat),
+		)
+
+		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }
@@ -68,4 +83,13 @@ func extractToken(c *gin.Context) string {
 	}
 
 	return ""
+}
+
+func UserIDFromContext(ctx context.Context) (int64, bool) {
+	userID, ok := ctx.Value(userIDKey).(int64)
+	return userID, ok
+}
+
+func WithUserID(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, userIDKey, userID)
 }

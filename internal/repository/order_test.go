@@ -9,6 +9,7 @@ import (
 	"github.com/FeshLig/gophermart/internal/repository"
 	"github.com/pashagolub/pgxmock/v3"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestCreateOrder(t *testing.T) {
@@ -29,7 +30,7 @@ func TestCreateOrder(t *testing.T) {
 		WithArgs(order.Number, order.UserID, order.Status).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	err = repo.CreateOrder(ctx, order)
 	require.NoError(t, err)
@@ -42,7 +43,7 @@ func TestGetOrdersByUser(t *testing.T) {
 	mock, _ := pgxmock.NewPool()
 	defer mock.Close()
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	now := time.Now()
 	rows := pgxmock.NewRows([]string{"number", "user_id", "status", "accrual", "uploaded_at"}).
@@ -67,7 +68,7 @@ func TestGetOrderByNumber(t *testing.T) {
 	mock, _ := pgxmock.NewPool()
 	defer mock.Close()
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	now := time.Now()
 	row := pgxmock.NewRows([]string{"number", "user_id", "status", "accrual", "uploaded_at"}).
@@ -89,7 +90,7 @@ func TestUpdateOrderStatus(t *testing.T) {
 	mock, _ := pgxmock.NewPool()
 	defer mock.Close()
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	status := model.StatusProcessed
 	accrual := 50.0
@@ -109,7 +110,7 @@ func TestUpdateOrderStatus_NotFound(t *testing.T) {
 	mock, _ := pgxmock.NewPool()
 	defer mock.Close()
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	status := model.StatusProcessed
 	accrual := 50.0
@@ -129,7 +130,7 @@ func TestGetOrdersByStatus(t *testing.T) {
 	mock, _ := pgxmock.NewPool()
 	defer mock.Close()
 
-	repo := repository.NewPostgresWithDB(mock)
+	repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 	now := time.Now()
 	rows := pgxmock.NewRows([]string{"number", "user_id", "status", "accrual", "uploaded_at"}).

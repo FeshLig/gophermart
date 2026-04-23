@@ -10,6 +10,7 @@ import (
 	"github.com/FeshLig/gophermart/internal/repository"
 	"github.com/pashagolub/pgxmock/v3"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestCreateWithdrawal(t *testing.T) {
@@ -19,18 +20,18 @@ func TestCreateWithdrawal(t *testing.T) {
 		name          string
 		mockSetup     func(mock pgxmock.PgxPoolIface)
 		expectedError error
+		checkIsFunds  bool
 	}{
 		{
 			name: "success",
 			mockSetup: func(mock pgxmock.PgxPoolIface) {
 				mock.ExpectBegin()
 
-				rows := pgxmock.NewRows([]string{"balance"}).
-					AddRow(100.0)
-
 				mock.ExpectQuery("SELECT").
-					WithArgs(int64(1)).
-					WillReturnRows(rows)
+					WithArgs(int64(1), 50.0).
+					WillReturnRows(
+						pgxmock.NewRows([]string{"ok"}).AddRow(true),
+					)
 
 				mock.ExpectExec("INSERT INTO withdrawals").
 					WithArgs(int64(1), int64(123), 50.0).
@@ -42,17 +43,18 @@ func TestCreateWithdrawal(t *testing.T) {
 		{
 			name: "begin error",
 			mockSetup: func(mock pgxmock.PgxPoolIface) {
-				mock.ExpectBegin().WillReturnError(errors.New("begin error"))
+				mock.ExpectBegin().
+					WillReturnError(errors.New("begin error"))
 			},
 			expectedError: errors.New("begin error"),
 		},
 		{
-			name: "select error",
+			name: "select error (balance check)",
 			mockSetup: func(mock pgxmock.PgxPoolIface) {
 				mock.ExpectBegin()
 
 				mock.ExpectQuery("SELECT").
-					WithArgs(int64(1)).
+					WithArgs(int64(1), 50.0).
 					WillReturnError(errors.New("select error"))
 
 				mock.ExpectRollback()
@@ -64,28 +66,27 @@ func TestCreateWithdrawal(t *testing.T) {
 			mockSetup: func(mock pgxmock.PgxPoolIface) {
 				mock.ExpectBegin()
 
-				rows := pgxmock.NewRows([]string{"balance"}).
-					AddRow(10.0)
-
 				mock.ExpectQuery("SELECT").
-					WithArgs(int64(1)).
-					WillReturnRows(rows)
+					WithArgs(int64(1), 50.0).
+					WillReturnRows(
+						pgxmock.NewRows([]string{"ok"}).AddRow(false),
+					)
 
 				mock.ExpectRollback()
 			},
 			expectedError: repository.ErrInsufficientFunds,
+			checkIsFunds:  true,
 		},
 		{
 			name: "insert error",
 			mockSetup: func(mock pgxmock.PgxPoolIface) {
 				mock.ExpectBegin()
 
-				rows := pgxmock.NewRows([]string{"balance"}).
-					AddRow(100.0)
-
 				mock.ExpectQuery("SELECT").
-					WithArgs(int64(1)).
-					WillReturnRows(rows)
+					WithArgs(int64(1), 50.0).
+					WillReturnRows(
+						pgxmock.NewRows([]string{"ok"}).AddRow(true),
+					)
 
 				mock.ExpectExec("INSERT INTO withdrawals").
 					WithArgs(int64(1), int64(123), 50.0).
@@ -100,18 +101,18 @@ func TestCreateWithdrawal(t *testing.T) {
 			mockSetup: func(mock pgxmock.PgxPoolIface) {
 				mock.ExpectBegin()
 
-				rows := pgxmock.NewRows([]string{"balance"}).
-					AddRow(100.0)
-
 				mock.ExpectQuery("SELECT").
-					WithArgs(int64(1)).
-					WillReturnRows(rows)
+					WithArgs(int64(1), 50.0).
+					WillReturnRows(
+						pgxmock.NewRows([]string{"ok"}).AddRow(true),
+					)
 
 				mock.ExpectExec("INSERT INTO withdrawals").
 					WithArgs(int64(1), int64(123), 50.0).
 					WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
-				mock.ExpectCommit().WillReturnError(errors.New("commit error"))
+				mock.ExpectCommit().
+					WillReturnError(errors.New("commit error"))
 			},
 			expectedError: errors.New("commit error"),
 		},
@@ -125,7 +126,7 @@ func TestCreateWithdrawal(t *testing.T) {
 
 			tt.mockSetup(mock)
 
-			repo := repository.NewPostgresWithDB(mock)
+			repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 			err = repo.CreateWithdrawal(ctx, model.Withdrawal{
 				UserID:      1,
@@ -136,8 +137,10 @@ func TestCreateWithdrawal(t *testing.T) {
 			if tt.expectedError != nil {
 				require.Error(t, err)
 
-				if errors.Is(tt.expectedError, repository.ErrInsufficientFunds) {
+				if tt.checkIsFunds {
 					require.ErrorIs(t, err, repository.ErrInsufficientFunds)
+				} else {
+					require.EqualError(t, err, tt.expectedError.Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -155,7 +158,7 @@ func TestGetWithdrawalsByUser(t *testing.T) {
 		mock, _ := pgxmock.NewPool()
 		defer mock.Close()
 
-		repo := repository.NewPostgresWithDB(mock)
+		repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 		now := time.Now()
 
@@ -179,7 +182,7 @@ func TestGetWithdrawalsByUser(t *testing.T) {
 		mock, _ := pgxmock.NewPool()
 		defer mock.Close()
 
-		repo := repository.NewPostgresWithDB(mock)
+		repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 		rows := pgxmock.NewRows([]string{
 			"id", "user_id", "order_number", "sum", "processed_at",
@@ -199,7 +202,7 @@ func TestGetWithdrawalsByUser(t *testing.T) {
 		mock, _ := pgxmock.NewPool()
 		defer mock.Close()
 
-		repo := repository.NewPostgresWithDB(mock)
+		repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 		mock.ExpectQuery("SELECT").
 			WithArgs(int64(1)).
@@ -214,7 +217,7 @@ func TestGetWithdrawalsByUser(t *testing.T) {
 		mock, _ := pgxmock.NewPool()
 		defer mock.Close()
 
-		repo := repository.NewPostgresWithDB(mock)
+		repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 		rows := pgxmock.NewRows([]string{
 			"id", "user_id", "order_number", "sum", "processed_at",
@@ -238,7 +241,7 @@ func TestGetTotalWithdrawn(t *testing.T) {
 		mock, _ := pgxmock.NewPool()
 		defer mock.Close()
 
-		repo := repository.NewPostgresWithDB(mock)
+		repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 		rows := pgxmock.NewRows([]string{"sum"}).AddRow(150.0)
 
@@ -256,7 +259,7 @@ func TestGetTotalWithdrawn(t *testing.T) {
 		mock, _ := pgxmock.NewPool()
 		defer mock.Close()
 
-		repo := repository.NewPostgresWithDB(mock)
+		repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 		rows := pgxmock.NewRows([]string{"sum"}).AddRow(0.0)
 
@@ -274,7 +277,7 @@ func TestGetTotalWithdrawn(t *testing.T) {
 		mock, _ := pgxmock.NewPool()
 		defer mock.Close()
 
-		repo := repository.NewPostgresWithDB(mock)
+		repo := repository.NewPostgresWithDB(mock, zap.NewNop())
 
 		mock.ExpectQuery("SELECT").
 			WithArgs(int64(1)).

@@ -9,6 +9,7 @@ import (
 
 	"github.com/FeshLig/gophermart/internal/dto"
 	"github.com/FeshLig/gophermart/internal/handler"
+	"github.com/FeshLig/gophermart/internal/middleware"
 	"github.com/FeshLig/gophermart/internal/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
@@ -42,7 +43,8 @@ func (m *MockWithdrawalService) GetWithdrawals(ctx context.Context, userID int64
 }
 
 func addUserToContext(c *gin.Context, userID int64) {
-	c.Set("userID", userID)
+	ctx := middleware.WithUserID(c.Request.Context(), userID)
+	c.Request = c.Request.WithContext(ctx)
 }
 
 func TestBalanceHandler_GetBalance(t *testing.T) {

@@ -9,14 +9,6 @@ import (
 
 var ErrOrderNotFound = errors.New("order not found")
 
-type OrderRepository interface {
-	CreateOrder(ctx context.Context, order model.Order) error
-	GetOrdersByUser(ctx context.Context, userID int64) ([]model.Order, error)
-	GetOrderByNumber(ctx context.Context, number int64) (model.Order, error)
-	UpdateOrderStatus(ctx context.Context, number int64, status model.OrderStatus, accrual *float64) error
-	GetOrdersByStatus(ctx context.Context, statuses ...model.OrderStatus) ([]model.Order, error)
-}
-
 func (p *Postgres) CreateOrder(ctx context.Context, order model.Order) error {
 	_, err := p.pool.Exec(ctx, `
 		INSERT INTO orders (number, user_id, status)

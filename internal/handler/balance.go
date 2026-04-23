@@ -3,7 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/FeshLig/gophermart/internal/mapper"
+	"github.com/FeshLig/gophermart/internal/dto"
+	"github.com/FeshLig/gophermart/internal/middleware"
 	"github.com/FeshLig/gophermart/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +23,11 @@ func NewBalanceHandler(balanceService service.BalanceService, withdrawalService 
 
 // GetBalance возвращает текущий баланс пользователя
 func (h *BalanceHandler) GetBalance(c *gin.Context) {
-	userID := c.GetInt64("userID") // из AuthMiddleware
+	userID, exists := middleware.UserIDFromContext(c.Request.Context())
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
 	balance, err := h.balanceService.GetBalance(c.Request.Context(), userID)
 	if err != nil {
@@ -35,7 +40,11 @@ func (h *BalanceHandler) GetBalance(c *gin.Context) {
 
 // GetWithdrawals возвращает историю снятий пользователя
 func (h *BalanceHandler) GetWithdrawals(c *gin.Context) {
-	userID := c.GetInt64("userID") // из AuthMiddleware
+	userID, exists := middleware.UserIDFromContext(c.Request.Context())
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
 	withdrawals, err := h.withdrawalService.GetWithdrawals(c.Request.Context(), userID)
 	if err != nil {
@@ -43,5 +52,5 @@ func (h *BalanceHandler) GetWithdrawals(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, mapper.ToWithdrawalsDTO(withdrawals))
+	c.JSON(http.StatusOK, dto.ToWithdrawalsDTO(withdrawals))
 }

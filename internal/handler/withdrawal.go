@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/FeshLig/gophermart/internal/dto"
-	"github.com/FeshLig/gophermart/internal/mapper"
+	"github.com/FeshLig/gophermart/internal/middleware"
 	"github.com/FeshLig/gophermart/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -20,12 +20,11 @@ func NewWithdrawalHandler(ws service.WithdrawalService) *WithdrawalHandler {
 }
 
 func (h *WithdrawalHandler) Withdraw(c *gin.Context) {
-	userIDVal, exists := c.Get("userID")
+	userID, exists := middleware.UserIDFromContext(c.Request.Context())
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	userID := userIDVal.(int64)
 
 	var req dto.WithdrawRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -55,12 +54,11 @@ func (h *WithdrawalHandler) Withdraw(c *gin.Context) {
 }
 
 func (h *WithdrawalHandler) GetWithdrawals(c *gin.Context) {
-	userIDVal, exists := c.Get("userID")
+	userID, exists := middleware.UserIDFromContext(c.Request.Context())
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	userID := userIDVal.(int64)
 
 	withdrawals, err := h.withdrawalService.GetWithdrawals(c.Request.Context(), userID)
 	if err != nil {
@@ -68,5 +66,5 @@ func (h *WithdrawalHandler) GetWithdrawals(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, mapper.ToWithdrawalsDTO(withdrawals))
+	c.JSON(http.StatusOK, dto.ToWithdrawalsDTO(withdrawals))
 }

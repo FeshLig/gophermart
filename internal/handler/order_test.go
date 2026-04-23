@@ -9,8 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/FeshLig/gophermart/internal/dto"
 	"github.com/FeshLig/gophermart/internal/handler"
-	"github.com/FeshLig/gophermart/internal/mapper"
+	"github.com/FeshLig/gophermart/internal/middleware"
 	"github.com/FeshLig/gophermart/internal/model"
 	"github.com/FeshLig/gophermart/internal/service"
 	"github.com/gin-gonic/gin"
@@ -82,11 +83,12 @@ func (h *OrderHandler) GetOrders(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, mapper.ToOrdersDTO(orders))
+	c.JSON(http.StatusOK, dto.ToOrdersDTO(orders))
 }
 
-func addUser(c *gin.Context, id int64) {
-	c.Set("userID", id)
+func addUser(c *gin.Context, userID int64) {
+	ctx := middleware.WithUserID(c.Request.Context(), userID)
+	c.Request = c.Request.WithContext(ctx)
 }
 
 func TestOrderHandler_UploadOrder(t *testing.T) {

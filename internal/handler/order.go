@@ -4,7 +4,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/FeshLig/gophermart/internal/mapper"
+	"github.com/FeshLig/gophermart/internal/dto"
+	"github.com/FeshLig/gophermart/internal/middleware"
 	"github.com/FeshLig/gophermart/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -18,13 +19,18 @@ func NewOrderHandler(orderService service.OrderService) *OrderHandler {
 }
 
 func (h *OrderHandler) UploadOrder(c *gin.Context) {
-	userID := c.GetInt64("userID")
+	userID, exists := middleware.UserIDFromContext(c.Request.Context())
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil || len(body) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+
 	orderNumber := string(body)
 
 	err = h.orderService.UploadOrder(c.Request.Context(), userID, orderNumber)
@@ -46,7 +52,11 @@ func (h *OrderHandler) UploadOrder(c *gin.Context) {
 }
 
 func (h *OrderHandler) GetOrders(c *gin.Context) {
-	userID := c.GetInt64("userID")
+	userID, exists := middleware.UserIDFromContext(c.Request.Context())
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
 	orders, err := h.orderService.GetOrders(c.Request.Context(), userID)
 	if err != nil {
@@ -54,5 +64,5 @@ func (h *OrderHandler) GetOrders(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, mapper.ToOrdersDTO(orders))
+	c.JSON(http.StatusOK, dto.ToOrdersDTO(orders))
 }

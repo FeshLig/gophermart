@@ -5,41 +5,51 @@ import (
 	"errors"
 
 	"github.com/FeshLig/gophermart/internal/model"
+	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 var ErrInsufficientFunds = errors.New("insufficient funds")
-
-type WithdrawalRepository interface {
-	CreateWithdrawal(ctx context.Context, withdrawal model.Withdrawal) error
-	GetWithdrawalsByUser(ctx context.Context, userID int64) ([]model.Withdrawal, error)
-	GetTotalWithdrawn(ctx context.Context, userID int64) (float64, error)
-}
 
 func (p *Postgres) CreateWithdrawal(ctx context.Context, withdrawal model.Withdrawal) error {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
+
 	defer func() {
-		_ = tx.Rollback(ctx)
+		if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			p.logger.Warn("failed to rollback transaction",
+				zap.Int64("user_id", withdrawal.UserID),
+				zap.Int64("order_number", withdrawal.OrderNumber),
+				zap.Error(err),
+			)
+		}
 	}()
-	var balance float64
+
+	var ok bool
 
 	err = tx.QueryRow(ctx, `
-		SELECT 
-			COALESCE(SUM(accrual), 0) - COALESCE((
-				SELECT SUM(sum) FROM withdrawals WHERE user_id = $1
-			), 0)
-		FROM orders
-		WHERE user_id = $1
-		AND status = 'PROCESSED'
-	`, withdrawal.UserID).Scan(&balance)
+		WITH balance AS (
+			SELECT 
+				COALESCE(SUM(o.accrual), 0)
+				- COALESCE(
+					(SELECT SUM(w.sum) FROM withdrawals w WHERE w.user_id = $1),
+					0
+				) AS available
+			FROM orders o
+			WHERE o.user_id = $1
+			  AND o.status = 'PROCESSED'
+		)
+		SELECT available >= $2
+		FROM balance
+	`, withdrawal.UserID, withdrawal.Sum).Scan(&ok)
 
 	if err != nil {
 		return err
 	}
 
-	if balance < withdrawal.Sum {
+	if !ok {
 		return ErrInsufficientFunds
 	}
 
@@ -52,7 +62,11 @@ func (p *Postgres) CreateWithdrawal(ctx context.Context, withdrawal model.Withdr
 		return err
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *Postgres) GetWithdrawalsByUser(ctx context.Context, userID int64) ([]model.Withdrawal, error) {

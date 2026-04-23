@@ -14,7 +14,7 @@ type Config struct {
 	AccuralAddress flags.AccuralSystemAddress
 }
 
-func GetConfig() Config {
+func GetConfig() (Config, error) {
 	config := Config{
 		Address: flags.RunAddress{
 			Host: "localhost",
@@ -27,12 +27,12 @@ func GetConfig() Config {
 		DatabaseURI: "",
 	}
 
-	parseFlags(&config)
 	if err := parseEnv(&config); err != nil {
-		panic(err)
+		return Config{}, fmt.Errorf("parse env: %w", err)
 	}
+	parseFlags(&config)
 
-	return config
+	return config, nil
 }
 
 func parseFlags(config *Config) {

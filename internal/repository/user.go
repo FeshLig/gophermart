@@ -6,11 +6,6 @@ import (
 	"github.com/FeshLig/gophermart/internal/model"
 )
 
-type UserRepository interface {
-	CreateUser(ctx context.Context, user model.User) (int64, error)
-	GetUserByLogin(ctx context.Context, login string) (model.User, error)
-}
-
 func (p *Postgres) CreateUser(ctx context.Context, user model.User) (int64, error) {
 	var id int64
 
