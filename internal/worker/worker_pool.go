@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/FeshLig/gophermart/internal/accrual"
@@ -14,7 +15,7 @@ import (
 )
 
 type AccrualClient interface {
-	GetOrder(ctx context.Context, number string) (*accrual.Response, int, error)
+	GetOrder(ctx context.Context, number string) (*accrual.Response, int, http.Header, error)
 }
 
 type OrderWorkerPool struct {
@@ -25,8 +26,8 @@ type OrderWorkerPool struct {
 	workers  int
 	interval time.Duration
 
-	jobs    chan model.Order
-	pauseCh chan time.Duration
+	jobs       chan model.Order
+	pauseUntil atomic.Int64
 }
 
 func NewOrderWorker(
@@ -41,7 +42,6 @@ func NewOrderWorker(
 		interval: 2 * time.Second,
 		workers:  5,
 		jobs:     make(chan model.Order, 100),
-		pauseCh:  make(chan time.Duration, 1),
 		logger:   logger,
 	}
 }
@@ -97,21 +97,12 @@ func (p *OrderWorkerPool) Worker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 
-		case dur := <-p.pauseCh:
-			timer := time.NewTimer(dur)
-
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C:
-			}
-
 		case order, ok := <-p.jobs:
 			if !ok {
 				return
 			}
 
+			p.waitIfPaused(ctx)
 			p.Handle(ctx, order)
 		}
 	}
@@ -124,7 +115,7 @@ func (p *OrderWorkerPool) Handle(ctx context.Context, order model.Order) {
 		zap.Int64("order_number", order.Number),
 	)
 
-	resp, statusCode, err := p.client.GetOrder(ctx, number)
+	resp, statusCode, headers, err := p.client.GetOrder(ctx, number)
 	if err != nil {
 		p.logger.Error("worker: accrual request error",
 			zap.Int64("order_number", order.Number),
@@ -142,9 +133,26 @@ func (p *OrderWorkerPool) Handle(ctx context.Context, order model.Order) {
 			zap.Int64("order_number", order.Number),
 		)
 
-		select {
-		case p.pauseCh <- time.Second:
-		default:
+		retryAfter := time.Second
+
+		if h := headers.Get("Retry-After"); h != "" {
+			if sec, err := strconv.Atoi(h); err == nil {
+				retryAfter = time.Duration(sec) * time.Second
+			}
+		}
+
+		until := time.Now().Add(retryAfter).UnixNano()
+
+		for {
+			old := p.pauseUntil.Load()
+
+			if old >= until {
+				break
+			}
+
+			if p.pauseUntil.CompareAndSwap(old, until) {
+				break
+			}
 		}
 
 		return
@@ -178,10 +186,30 @@ func (p *OrderWorkerPool) Handle(ctx context.Context, order model.Order) {
 	)
 }
 
-func (p *OrderWorkerPool) PauseCh() <-chan time.Duration {
-	return p.pauseCh
-}
-
 func (p *OrderWorkerPool) SetInterval(d time.Duration) {
 	p.interval = d
+}
+
+func (p *OrderWorkerPool) waitIfPaused(ctx context.Context) {
+	for {
+		pauseUntil := p.pauseUntil.Load()
+		now := time.Now().UnixNano()
+
+		if pauseUntil <= now {
+			return
+		}
+
+		sleep := time.Duration(pauseUntil - now)
+
+		select {
+		case <-time.After(sleep):
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (p *OrderWorkerPool) PauseUntil() int64 {
+	return p.pauseUntil.Load()
 }

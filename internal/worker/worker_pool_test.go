@@ -59,14 +59,14 @@ func (m *mockRepo) GetOrdersByStatus(ctx context.Context, statuses ...model.Orde
 }
 
 type mockClient struct {
-	getOrderFn func(ctx context.Context, number string) (*accrual.Response, int, error)
+	getOrderFn func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error)
 }
 
-func (m *mockClient) GetOrder(ctx context.Context, number string) (*accrual.Response, int, error) {
+func (m *mockClient) GetOrder(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
 	if m.getOrderFn != nil {
 		return m.getOrderFn(ctx, number)
 	}
-	return nil, 0, nil
+	return nil, 0, nil, nil
 }
 
 func TestHandle_Success(t *testing.T) {
@@ -86,13 +86,13 @@ func TestHandle_Success(t *testing.T) {
 	}
 
 	client := &mockClient{
-		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, error) {
+		func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
 			val := 100.0
 			return &accrual.Response{
 				Order:   number,
 				Status:  "PROCESSED",
 				Accrual: &val,
-			}, http.StatusOK, nil
+			}, http.StatusOK, http.Header{}, nil
 		},
 	}
 
@@ -109,8 +109,8 @@ func TestHandle_AccrualError(t *testing.T) {
 	repo := &mockRepo{}
 
 	client := &mockClient{
-		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, error) {
-			return nil, 0, assert.AnError
+		func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
+			return nil, 0, http.Header{}, assert.AnError
 		},
 	}
 
@@ -125,20 +125,22 @@ func TestHandle_RateLimit(t *testing.T) {
 	repo := &mockRepo{}
 
 	client := &mockClient{
-		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, error) {
-			return nil, http.StatusTooManyRequests, nil
+		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
+			headers := http.Header{}
+			headers.Set("Retry-After", "2")
+			return nil, http.StatusTooManyRequests, headers, nil
 		},
 	}
 
 	w := worker.NewOrderWorker(repo, client, zap.NewNop())
 
+	before := time.Now().UnixNano()
+
 	w.Handle(ctx, model.Order{Number: 1})
 
-	select {
-	case <-w.PauseCh():
-	default:
-		t.Fatal("expected pause signal")
-	}
+	pauseUntil := w.PauseUntil()
+
+	assert.Greater(t, pauseUntil, before, "pauseUntil should be in the future")
 }
 
 func TestHandle_NoContent(t *testing.T) {
@@ -147,8 +149,8 @@ func TestHandle_NoContent(t *testing.T) {
 	repo := &mockRepo{}
 
 	client := &mockClient{
-		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, error) {
-			return nil, http.StatusNoContent, nil
+		func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
+			return nil, http.StatusNoContent, http.Header{}, nil
 		},
 	}
 
@@ -167,12 +169,12 @@ func TestHandle_UpdateError(t *testing.T) {
 	}
 
 	client := &mockClient{
-		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, error) {
+		func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
 			val := 50.0
 			return &accrual.Response{
 				Status:  "PROCESSED",
 				Accrual: &val,
-			}, http.StatusOK, nil
+			}, http.StatusOK, http.Header{}, nil
 		},
 	}
 
@@ -208,12 +210,12 @@ func TestProduce(t *testing.T) {
 	}
 
 	client := &mockClient{
-		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, error) {
+		func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
 			val := 10.0
 			return &accrual.Response{
 				Status:  "PROCESSED",
 				Accrual: &val,
-			}, http.StatusOK, nil
+			}, http.StatusOK, http.Header{}, nil
 		},
 	}
 
@@ -252,12 +254,12 @@ func TestWorker_ProcessJob(t *testing.T) {
 	}
 
 	client := &mockClient{
-		getOrderFn: func(ctx context.Context, number string) (*accrual.Response, int, error) {
+		func(ctx context.Context, number string) (*accrual.Response, int, http.Header, error) {
 			val := 10.0
 			return &accrual.Response{
 				Status:  "PROCESSED",
 				Accrual: &val,
-			}, http.StatusOK, nil
+			}, http.StatusOK, http.Header{}, nil
 		},
 	}
 

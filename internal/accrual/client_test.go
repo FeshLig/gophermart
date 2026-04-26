@@ -26,7 +26,7 @@ func TestGetOrder_Success(t *testing.T) {
 
 	client := accrual.NewClient(server.URL, time.Second)
 
-	resp, code, err := client.GetOrder(context.Background(), "123")
+	resp, code, _, err := client.GetOrder(context.Background(), "123")
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, code)
@@ -43,7 +43,7 @@ func TestGetOrder_NoContent(t *testing.T) {
 
 	client := accrual.NewClient(server.URL, time.Second)
 
-	resp, code, err := client.GetOrder(context.Background(), "123")
+	resp, code, _, err := client.GetOrder(context.Background(), "123")
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusNoContent, code)
@@ -58,7 +58,7 @@ func TestGetOrder_ErrorStatus(t *testing.T) {
 
 	client := accrual.NewClient(server.URL, time.Second)
 
-	resp, code, err := client.GetOrder(context.Background(), "123")
+	resp, code, _, err := client.GetOrder(context.Background(), "123")
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusBadRequest, code)
@@ -74,7 +74,7 @@ func TestGetOrder_DecodeError(t *testing.T) {
 
 	client := accrual.NewClient(server.URL, time.Second)
 
-	resp, code, err := client.GetOrder(context.Background(), "123")
+	resp, code, _, err := client.GetOrder(context.Background(), "123")
 
 	require.Error(t, err)
 	require.Equal(t, http.StatusOK, code)
@@ -92,7 +92,7 @@ func TestGetOrder_Timeout(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, _, err := client.GetOrder(ctx, "123")
+	_, _, _, err := client.GetOrder(ctx, "123")
 
 	require.Error(t, err)
 }
@@ -119,7 +119,7 @@ func TestRetryLogic(t *testing.T) {
 
 	client := accrual.NewClient(server.URL, time.Second)
 
-	resp, code, err := client.GetOrder(context.Background(), "123")
+	resp, code, _, err := client.GetOrder(context.Background(), "123")
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, code)
@@ -138,7 +138,7 @@ func TestRetryLogic_FailAll(t *testing.T) {
 
 	client := accrual.NewClient(server.URL, time.Second)
 
-	resp, code, err := client.GetOrder(context.Background(), "123")
+	resp, code, _, err := client.GetOrder(context.Background(), "123")
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusInternalServerError, code)
@@ -149,7 +149,7 @@ func TestRetryLogic_FailAll(t *testing.T) {
 func TestGetOrder_RequestCreationError(t *testing.T) {
 	client := accrual.NewClient("http://invalid-url-%", time.Second)
 
-	_, _, err := client.GetOrder(context.Background(), "123")
+	_, _, _, err := client.GetOrder(context.Background(), "123")
 
 	require.Error(t, err)
 }
@@ -166,7 +166,7 @@ func TestGetOrder_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := client.GetOrder(ctx, "123")
+	_, _, _, err := client.GetOrder(ctx, "123")
 
 	require.Error(t, err)
 }
