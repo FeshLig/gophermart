@@ -1,0 +1,552 @@
+Ваш план в целом хороший — видно, что вы мыслите слоями архитектуры. Но я бы немного переставил порядок, чтобы:
+
+быстрее получить запускающийся сервер
+
+избежать ситуаций, когда вы пишете много кода без возможности его проверить
+
+упростить тестирование
+
+Я покажу рекомендованный порядок для Go backend-проекта.
+
+1. Шаг 1 — структура проекта
+
+Сначала лучше создать каркас проекта, чтобы не пришлось потом всё переносить.
+
+Пример:
+
+cmd/gophermart/main.go
+
+internal/
+
+    config/
+        config.go
+
+    handler/
+    service/
+    repository/
+    model/
+    dto/
+    middleware/
+    worker/
+    accrual/
+
+pkg/
+    luhn/
+
+Это займет 5 минут, но избавит от хаоса.
+
+2. Шаг 2 — конфигурация
+
+Раньше, чем БД.
+
+Почему:
+
+база зависит от config
+
+worker зависит от config
+
+server зависит от config
+
+В config:
+
+RUN_ADDRESS
+DATABASE_URI
+ACCRUAL_SYSTEM_ADDRESS
+
+Пример структуры:
+
+type Config struct {
+    RunAddress           string
+    DatabaseURI          string
+    AccrualSystemAddress string
+}
+3. Шаг 3 — подключение к PostgreSQL
+
+Сделать:
+
+internal/repository/postgres.go
+
+Создать:
+
+NewPostgres()
+Ping()
+Close()
+
+И проверить, что сервер может подключиться к БД.
+
+4. Шаг 4 — схема базы данных
+
+Теперь создаёте таблицы:
+
+users
+orders
+withdrawals
+
+Пример (упрощённо):
+
+users
+-----
+id
+login
+password_hash
+created_at
+orders
+------
+number
+user_id
+status
+accrual
+uploaded_at
+withdrawals
+-----------
+id
+user_id
+order
+sum
+processed_at
+5. Шаг 5 — модели (model)
+
+Это структуры БД.
+
+internal/model
+
+Например:
+
+type User struct {
+    ID           int64
+    Login        string
+    PasswordHash string
+}
+6. Шаг 6 — repository
+
+Теперь пишете repository слой.
+
+Например:
+
+UserRepository
+OrderRepository
+WithdrawalRepository
+
+Методы:
+
+CreateUser
+GetUserByLogin
+GetUserByID
+CreateOrder
+GetOrdersByUser
+GetOrdersForProcessing
+UpdateOrder
+CreateWithdrawal
+GetWithdrawalsByUser
+
+На этом этапе можно уже писать unit-тесты.
+
+7. Шаг 7 — сервисы
+
+Теперь появляется бизнес-логика.
+
+AuthService
+OrderService
+BalanceService
+
+Например:
+
+Register
+Login
+UploadOrder
+GetOrders
+GetBalance
+Withdraw
+
+Service использует repository.
+
+8. Шаг 8 — JWT
+
+Теперь добавляете:
+
+internal/auth
+
+Функции:
+
+GenerateToken(userID)
+ParseToken(token)
+9. Шаг 9 — middleware
+
+Теперь можно написать:
+
+AuthMiddleware
+GzipMiddleware
+LoggerMiddleware
+
+AuthMiddleware будет использовать JWT.
+
+10. Шаг 10 — DTO
+
+Теперь описываете HTTP структуры.
+
+RegisterRequest
+LoginRequest
+OrderResponse
+BalanceResponse
+WithdrawalResponse
+
+DTO не должны совпадать с model.
+
+11. Шаг 11 — handlers
+
+Теперь пишете handlers.
+
+AuthHandler
+OrderHandler
+BalanceHandler
+WithdrawalHandler
+
+Handler:
+
+парсит HTTP
+вызывает service
+формирует DTO
+12. Шаг 12 — router
+
+Теперь настраиваете Gin.
+
+public routes
+private routes
+13. Шаг 13 — worker
+
+Теперь можно написать worker:
+
+internal/worker/accrual_worker.go
+
+Он использует:
+
+OrderRepository
+AccrualClient
+BalanceService
+14. Шаг 14 — accrual client
+
+Создаёте:
+
+internal/accrual/client.go
+
+Метод:
+
+GetOrderInfo(number)
+15. Шаг 15 — main.go
+
+Теперь всё собираете.
+
+config
+db
+repositories
+services
+handlers
+router
+worker
+server
+Итоговый порядок (оптимальный)
+
+Я бы рекомендовал такой:
+
+1. структура проекта
+2. config
+3. подключение БД
+4. схема БД
+5. модели
+6. repository
+7. сервисы
+8. JWT
+9. middleware
+10. DTO
+11. handlers
+12. router
+13. worker
+14. accrual client
+15. main.go
+Очень важный совет
+
+Не пишите всё сразу.
+
+Лучше делать вертикально:
+
+этап 1
+register
+login
+этап 2
+orders
+этап 3
+balance
+withdrawals
+этап 4
+worker
+accrual
+
+Это сильно упрощает разработку.
+
+Если хотите, я могу ещё показать одну очень полезную вещь для этого проекта:
+
+👉 идеальную SQL схему таблицы orders, которая сильно упрощает worker и предотвращает несколько неприятных race conditions.
+
+
+
+
+Хорошо. В этом проекте таблица orders — центральная, и от её схемы зависит:
+
+простота работы worker
+
+отсутствие race conditions
+
+корректное начисление баллов
+
+удобные запросы
+
+Я покажу практичную схему, которую обычно используют для этого задания.
+
+1. Таблица users
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY,
+    login TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+Почему так:
+
+BIGSERIAL — стандарт для id
+
+login UNIQUE — чтобы нельзя было зарегистрировать одинаковые логины
+
+пароль хранится только как hash
+
+2. Таблица orders
+
+Это самая важная таблица.
+
+CREATE TABLE orders (
+    number BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    status TEXT NOT NULL,
+    accrual DOUBLE PRECISION,
+    uploaded_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+Разберём поля.
+
+number
+number BIGINT PRIMARY KEY
+
+Почему PRIMARY KEY:
+
+номер заказа уникальный
+
+удобно искать
+
+Это позволит быстро проверять:
+
+существует ли заказ
+user_id
+user_id BIGINT REFERENCES users(id)
+
+Это связь:
+
+user 1 -> many orders
+status
+status TEXT NOT NULL
+
+Возможные значения:
+
+NEW
+PROCESSING
+INVALID
+PROCESSED
+
+Это статусы из ТЗ.
+
+accrual
+accrual DOUBLE PRECISION
+
+Баллы, полученные от внешнего сервиса.
+
+Может быть:
+
+NULL
+
+пока заказ не обработан.
+
+uploaded_at
+uploaded_at TIMESTAMP DEFAULT now()
+
+Нужно для:
+
+GET /api/user/orders
+
+ТЗ требует сортировку по времени загрузки.
+
+3. Таблица withdrawals
+CREATE TABLE withdrawals (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    order_number BIGINT NOT NULL,
+    sum DOUBLE PRECISION NOT NULL,
+    processed_at TIMESTAMP NOT NULL DEFAULT now()
+);
+order_number
+
+Номер заказа, по которому списали баллы.
+
+ТЗ требует:
+
+order
+sum
+processed_at
+4. Индексы (очень желательно)
+
+Для worker.
+
+CREATE INDEX idx_orders_status ON orders(status);
+
+Worker будет делать запрос:
+
+SELECT * FROM orders
+WHERE status IN ('NEW','PROCESSING')
+
+Без индекса это будет медленно.
+
+5. Очень важная проверка из ТЗ
+
+В ТЗ есть требование:
+
+если заказ уже загружен другим пользователем — вернуть 409
+
+Для этого нужен такой запрос:
+
+SELECT user_id FROM orders WHERE number=$1
+
+Если:
+
+нет записи → можно вставить
+есть запись и user_id тот же → 200
+есть запись и user_id другой → 409
+6. Как worker будет брать заказы
+
+Worker делает:
+
+SELECT number FROM orders
+WHERE status IN ('NEW','PROCESSING')
+LIMIT 10;
+
+После чего:
+
+GET /api/orders/{number}
+
+в accrual system.
+
+7. Обновление заказа
+
+Когда приходит ответ:
+
+{
+ "order":"12345",
+ "status":"PROCESSED",
+ "accrual":500
+}
+
+worker делает:
+
+UPDATE orders
+SET status=$1, accrual=$2
+WHERE number=$3
+8. Как начисляются баллы
+
+Когда статус:
+
+PROCESSED
+
+нужно:
+
+добавить accrual к балансу пользователя
+
+Но баланс обычно не хранят в таблице users.
+
+Лучше считать его запросом:
+
+SUM(accrual) - SUM(withdrawals)
+9. Запрос баланса
+SELECT
+    COALESCE(SUM(accrual),0)
+FROM orders
+WHERE user_id=$1 AND status='PROCESSED'
+
+и
+
+SELECT
+    COALESCE(SUM(sum),0)
+FROM withdrawals
+WHERE user_id=$1
+10. Итоговая схема
+users
+------
+id
+login
+password_hash
+created_at
+
+
+orders
+------
+number
+user_id
+status
+accrual
+uploaded_at
+
+
+withdrawals
+-----------
+id
+user_id
+order_number
+sum
+processed_at
+11. Очень полезное улучшение (рекомендую)
+
+Добавить уникальность списания заказа.
+
+ALTER TABLE withdrawals
+ADD CONSTRAINT unique_withdraw_order UNIQUE(order_number);
+
+Чтобы нельзя было списать один заказ дважды.
+
+12. Реальный production-лайфхак
+
+Я бы сделал статус ENUM:
+
+CREATE TYPE order_status AS ENUM (
+    'NEW',
+    'PROCESSING',
+    'INVALID',
+    'PROCESSED'
+);
+
+И таблицу:
+
+status order_status NOT NULL
+
+Это защищает от ошибок.
+
+13. Как это будет выглядеть в Go
+type Order struct {
+    Number     int64
+    UserID     int64
+    Status     string
+    Accrual    *float64
+    UploadedAt time.Time
+}
+
+Если хотите, я могу ещё показать 3 архитектурные ошибки, которые делают 90% людей в этом проекте, из-за которых:
+
+падают автотесты
+
+ломается worker
+
+появляются гонки данных.
